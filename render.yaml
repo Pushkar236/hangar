@@ -1,0 +1,27 @@
+# Render Blueprint for the Hangar orchestrator (the WebSocket service that
+# bridges browser terminals to E2B sandboxes). Render supports WebSockets and
+# needs no credit card / CLI login.
+#
+# Deploy: Render dashboard → New → Blueprint → connect github.com/Pushkar236/hangar
+# → it reads this file → set E2B_API_KEY when prompted → Create.
+# Service URL will be https://hangar-orchestrator.onrender.com
+# (so the frontend uses wss://hangar-orchestrator.onrender.com).
+services:
+  - type: web
+    name: hangar-orchestrator
+    runtime: node
+    rootDir: server
+    plan: free
+    region: oregon
+    buildCommand: npm install && npm run build
+    startCommand: npm run start
+    healthCheckPath: /health
+    envVars:
+      - key: E2B_API_KEY
+        sync: false # set in the dashboard (secret) — never committed
+      - key: E2B_TEMPLATE
+        value: base
+      - key: SANDBOX_TIMEOUT_MS
+        value: "600000"
+      - key: NODE_VERSION
+        value: "22"

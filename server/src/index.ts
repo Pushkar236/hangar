@@ -1,3 +1,4 @@
+import { createServer } from "node:http";
 import { WebSocketServer, WebSocket } from "ws";
 import { Sandbox } from "e2b";
 
@@ -32,7 +33,19 @@ type ClientMessage =
   | { type: "input"; data: string }
   | { type: "resize"; cols: number; rows: number };
 
-const wss = new WebSocketServer({ port: PORT });
+// A tiny HTTP server so hosts (Render/Fly/etc.) get a health endpoint; the
+// WebSocket server shares the same port via the HTTP upgrade.
+const httpServer = createServer((req, res) => {
+  if (req.url === "/health" || req.url === "/") {
+    res.writeHead(200, { "Content-Type": "text/plain" });
+    res.end("ok");
+  } else {
+    res.writeHead(404);
+    res.end();
+  }
+});
+
+const wss = new WebSocketServer({ server: httpServer });
 
 wss.on("connection", (ws: WebSocket) => {
   let sandbox: Sandbox | null = null;
@@ -139,6 +152,8 @@ wss.on("connection", (ws: WebSocket) => {
   ws.on("error", () => void cleanup());
 });
 
-console.log(
-  `hangar orchestrator listening on :${PORT} (template: ${CUSTOM_TEMPLATE ?? "base + runtime install"})`,
+httpServer.listen(PORT, () =>
+  console.log(
+    `hangar orchestrator listening on :${PORT} (template: ${CUSTOM_TEMPLATE ?? "base + runtime install"})`,
+  ),
 );
