@@ -58,6 +58,8 @@ export default function Terminal({
       if (msg.type === "data" && msg.data) {
         const bytes = Uint8Array.from(atob(msg.data), (c) => c.charCodeAt(0));
         term.write(bytes);
+      } else if (msg.type === "status") {
+        term.writeln(`\x1b[90m[hangar] ${msg.message ?? ""}\x1b[0m`);
       } else if (msg.type === "ready") {
         term.writeln("\x1b[90m[hangar] sandbox ready\x1b[0m");
       } else if (msg.type === "error") {

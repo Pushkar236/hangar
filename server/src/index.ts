@@ -15,9 +15,14 @@ import { Sandbox } from "e2b";
  */
 
 const PORT = Number(process.env.PORT) || 8080;
-// Our custom E2B template (built from sandbox/e2b.Dockerfile). Falls back to
-// "base" so the server still boots before the template is published.
-const TEMPLATE = process.env.E2B_TEMPLATE || "base";
+// If a prebuilt template (with Claude Code baked in) is published, set
+// E2B_TEMPLATE to its name to skip the per-session install. Otherwise we use
+// the default `base` sandbox (Node + npm preinstalled) and install Claude Code
+// at session start — no template build required for the MVP.
+const CUSTOM_TEMPLATE =
+  process.env.E2B_TEMPLATE && process.env.E2B_TEMPLATE !== "base"
+    ? process.env.E2B_TEMPLATE
+    : null;
 // Cap a sandbox's life so an abandoned tab can't run up cost. Refreshed on
 // activity via sandbox.setTimeout.
 const SANDBOX_TIMEOUT_MS = Number(process.env.SANDBOX_TIMEOUT_MS) || 10 * 60 * 1000;
@@ -78,9 +83,17 @@ wss.on("connection", (ws: WebSocket) => {
       else envs.ANTHROPIC_API_KEY = auth;
 
       try {
-        sandbox = await Sandbox.create(TEMPLATE, {
-          timeoutMs: SANDBOX_TIMEOUT_MS,
-        });
+        sandbox = CUSTOM_TEMPLATE
+          ? await Sandbox.create(CUSTOM_TEMPLATE, { timeoutMs: SANDBOX_TIMEOUT_MS })
+          : await Sandbox.create({ timeoutMs: SANDBOX_TIMEOUT_MS });
+        // Install Claude Code on the default base template (skipped if a
+        // prebuilt template already has it).
+        if (!CUSTOM_TEMPLATE) {
+          send({ type: "status", message: "Provisioning sandbox & installing Claude Code…" });
+          await sandbox.commands.run("npm install -g @anthropic-ai/claude-code", {
+            timeoutMs: 240_000,
+          });
+        }
         const handle = await sandbox.pty.create({
           cols: msg.cols ?? 80,
           rows: msg.rows ?? 24,
@@ -126,4 +139,6 @@ wss.on("connection", (ws: WebSocket) => {
   ws.on("error", () => void cleanup());
 });
 
-console.log(`hangar orchestrator listening on :${PORT} (template: ${TEMPLATE})`);
+console.log(
+  `hangar orchestrator listening on :${PORT} (template: ${CUSTOM_TEMPLATE ?? "base + runtime install"})`,
+);
