@@ -1,0 +1,16 @@
+app = "hangar-orchestrator"
+primary_region = "iad"
+
+[build]
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  # WebSocket upgrades ride over the HTTP service; HTTPS gives us WSS.
+  auto_stop_machines = true
+  auto_start_machines = true
+  min_machines_running = 0
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"

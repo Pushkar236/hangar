@@ -1,0 +1,9 @@
+# Minimal E2B template config. `e2b template build` will populate template_id
+# on first build. Run from this directory:
+#   e2b template build --name hangar-claude-code --dockerfile e2b.Dockerfile
+dockerfile = "e2b.Dockerfile"
+template_name = "hangar-claude-code"
+
+# Resourcing — bump if Claude Code needs more headroom for big repos.
+cpu_count = 2
+memory_mb = 2048
