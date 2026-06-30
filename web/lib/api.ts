@@ -10,6 +10,11 @@ export function clearToken() {
   localStorage.removeItem("hangar.token");
 }
 
+/** Fire-and-forget ping to wake the (free-tier) server before the user acts. */
+export function warmUp() {
+  fetch(API + "/health", { cache: "no-store" }).catch(() => {});
+}
+
 async function req<T>(path: string, opts: RequestInit = {}): Promise<T> {
   const token = getToken();
   const r = await fetch(API + path, {

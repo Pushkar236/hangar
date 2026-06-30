@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Hexagon } from "lucide-react";
-import { api, setToken } from "@/lib/api";
+import { api, setToken, warmUp } from "@/lib/api";
 
 export default function AuthScreen({
   onAuthed,
@@ -14,16 +14,27 @@ export default function AuthScreen({
   const [password, setPassword] = useState("");
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
+  const [slow, setSlow] = useState(false);
+
+  // Wake the free-tier server as soon as the screen loads, so it's warm by the
+  // time the user submits (avoids the "stuck button" cold-start feeling).
+  useEffect(() => {
+    warmUp();
+  }, []);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
     setErr("");
+    const slowTimer = setTimeout(() => setSlow(true), 4000);
     try {
       const r = mode === "login" ? await api.login(email, password) : await api.signup(email, password);
       setToken(r.token);
+      clearTimeout(slowTimer);
       onAuthed(r.user);
     } catch (e) {
+      clearTimeout(slowTimer);
+      setSlow(false);
       setErr(String((e as Error).message || e));
       setBusy(false);
     }
@@ -60,8 +71,20 @@ export default function AuthScreen({
           />
           {err && <p style={{ color: "#f4212e", fontSize: 13, margin: 0 }}>{err}</p>}
           <button className="hangar-btn" disabled={busy} type="submit">
-            {busy ? "…" : mode === "login" ? "Sign in" : "Create account"}
+            {busy
+              ? mode === "login"
+                ? "Signing in…"
+                : "Creating account…"
+              : mode === "login"
+                ? "Sign in"
+                : "Create account"}
           </button>
+          {busy && slow && (
+            <p className="hangar-muted" style={{ fontSize: 12, margin: 0, textAlign: "center" }}>
+              Waking the cloud server — the first request can take up to a minute
+              on the free tier. Hang tight…
+            </p>
+          )}
         </form>
         <p className="hangar-muted" style={{ textAlign: "center", marginTop: 18 }}>
           {mode === "login" ? "New here? " : "Already have an account? "}
