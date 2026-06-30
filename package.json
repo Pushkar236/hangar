@@ -1,0 +1,14 @@
+{
+  "name": "hangar",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Cloud Claude Code agent terminals. Monorepo: web/ (Vercel) + server/ (orchestrator) + sandbox/ (E2B template).",
+  "scripts": {
+    "install:all": "npm --prefix server install && npm --prefix web install",
+    "dev": "concurrently -n server,web -c blue,green \"npm --prefix server run dev\" \"npm --prefix web run dev\"",
+    "typecheck": "npm --prefix server run typecheck && npm --prefix web run typecheck"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0"
+  }
+}

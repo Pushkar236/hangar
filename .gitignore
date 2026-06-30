@@ -12,3 +12,5 @@ out/
 *.log
 .DS_Store
 .vercel
+# local debug helper (reads creds from env; not part of the product)
+server/test-client.mjs

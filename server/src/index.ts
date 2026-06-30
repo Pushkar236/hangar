@@ -1,3 +1,4 @@
+import "dotenv/config";
 import { createServer } from "node:http";
 import { WebSocketServer, WebSocket } from "ws";
 import { Sandbox } from "e2b";
@@ -120,8 +121,14 @@ wss.on("connection", (ws: WebSocket) => {
         if (msg.autostart !== false && pid != null) {
           await sandbox.pty.sendInput(pid, new TextEncoder().encode("claude\n"));
         }
-      } catch {
-        send({ type: "error", message: "failed to start sandbox" });
+      } catch (err) {
+        // Log the real reason server-side (never contains the credential) and
+        // surface a trimmed message to the client so failures are debuggable.
+        console.error("[start] failed:", err);
+        send({
+          type: "error",
+          message: `failed to start: ${String(err).slice(0, 300)}`,
+        });
         await cleanup();
         ws.close();
       } finally {
