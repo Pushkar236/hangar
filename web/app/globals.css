@@ -249,15 +249,107 @@ body > div {
 
 .hg-body {
   flex: 1;
-  display: flex;
   min-height: 0;
+  overflow: hidden;
 }
 .hg-sidebar {
-  width: 248px;
-  flex-shrink: 0;
+  width: 100%;
+  height: 100%;
   border-right: 1px solid var(--border);
   overflow-y: auto;
   background: var(--surface);
+}
+
+/* resize handles */
+.hg-rh {
+  width: 6px;
+  background: var(--border);
+  cursor: col-resize;
+  transition: background 0.12s;
+}
+.hg-rh-h {
+  width: 100%;
+  height: 6px;
+  cursor: row-resize;
+}
+.hg-rh:hover,
+.hg-rh[data-resize-handle-state="hover"],
+.hg-rh[data-resize-handle-state="drag"] {
+  background: var(--blue);
+}
+
+/* editor */
+.hg-editor {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: #1e1e1e;
+}
+.hg-etabs {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-height: 38px;
+  padding: 4px 6px;
+  background: #08090b;
+  border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+}
+.hg-etab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border-radius: 7px;
+  font-size: 13px;
+  color: var(--muted);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.hg-etab.active {
+  background: #1e1e1e;
+  color: var(--text);
+}
+.hg-dirty-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--blue);
+}
+.hg-save-btn {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: var(--blue);
+  color: #fff;
+  border: none;
+  border-radius: 7px;
+  padding: 5px 11px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.hg-editor-body {
+  flex: 1;
+  min-height: 0;
+}
+.hg-editor-empty {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  text-align: center;
+  padding: 24px;
+  color: var(--muted);
+}
+.hg-term-wrap {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--bg);
 }
 .hg-main {
   flex: 1;

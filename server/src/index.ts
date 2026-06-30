@@ -110,7 +110,8 @@ type ClientMessage =
   | { type: "resize"; terminalId: string; cols: number; rows: number }
   | { type: "close"; terminalId: string }
   | { type: "fs.list"; path?: string }
-  | { type: "fs.read"; path: string };
+  | { type: "fs.read"; path: string }
+  | { type: "fs.write"; path: string; content: string };
 
 wss.on("connection", (ws: WebSocket) => {
   let sandbox: Sandbox | null = null;
@@ -262,6 +263,12 @@ wss.on("connection", (ws: WebSocket) => {
         case "fs.read": {
           const content = await sandbox.files.read(msg.path);
           send({ type: "fs.file", path: msg.path, content: String(content).slice(0, 200_000) });
+          break;
+        }
+        case "fs.write": {
+          await sandbox.files.write(msg.path, msg.content);
+          await sandbox.setTimeout(SANDBOX_TIMEOUT_MS);
+          send({ type: "fs.saved", path: msg.path });
           break;
         }
       }

@@ -78,6 +78,9 @@ export class HangarSession {
   readFile(path: string) {
     this.out({ type: "fs.read", path });
   }
+  writeFile(path: string, content: string) {
+    this.out({ type: "fs.write", path, content });
+  }
   dispose() {
     try {
       this.ws.close();

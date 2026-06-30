@@ -54,17 +54,21 @@ export default function XTerm({
     if (autoOpen) session.openTerminal(terminalId, term.cols, term.rows);
     else session.resize(terminalId, term.cols, term.rows); // sync server's t1 size
 
-    const onWin = () => {
+    const refit = () => {
       try {
         fit.fit();
       } catch {
         /* noop */
       }
     };
-    window.addEventListener("resize", onWin);
+    window.addEventListener("resize", refit);
+    // Re-fit when the terminal panel itself is resized (drag handles).
+    const ro = new ResizeObserver(refit);
+    ro.observe(el);
 
     return () => {
-      window.removeEventListener("resize", onWin);
+      window.removeEventListener("resize", refit);
+      ro.disconnect();
       onData.dispose();
       onResize.dispose();
       session.offData(terminalId);
