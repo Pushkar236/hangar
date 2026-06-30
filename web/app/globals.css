@@ -52,3 +52,183 @@ body > div {
   color: #71767b;
   font-size: 13px;
 }
+
+/* ── Workbench (VS Code-style) ─────────────────────────────────────────── */
+.hg-app {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+.hg-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  border-bottom: 1px solid #2f3336;
+}
+.hg-muted {
+  color: #71767b;
+  font-size: 13px;
+}
+.hg-btn-end {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  color: #e7e9ea;
+  border: 1px solid #2f3336;
+  border-radius: 9999px;
+  padding: 5px 12px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.hg-btn-end:hover {
+  background: #1d1f23;
+}
+.hg-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  color: #e7e9ea;
+  border: none;
+  border-radius: 6px;
+  padding: 6px;
+  cursor: pointer;
+}
+.hg-icon-btn:hover {
+  background: #1d1f23;
+}
+.hg-body {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+}
+.hg-sidebar {
+  width: 240px;
+  flex-shrink: 0;
+  border-right: 1px solid #2f3336;
+  overflow-y: auto;
+  background: #0a0a0a;
+}
+.hg-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  position: relative;
+}
+.hg-tabs {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 6px;
+  border-bottom: 1px solid #2f3336;
+  overflow-x: auto;
+}
+.hg-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border-radius: 8px;
+  font-size: 13px;
+  color: #71767b;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.hg-tab.active {
+  background: #16181c;
+  color: #e7e9ea;
+}
+.hg-tab-x {
+  display: inline-flex;
+  background: transparent;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  padding: 0;
+  opacity: 0.6;
+}
+.hg-tab-x:hover {
+  opacity: 1;
+}
+.hg-term-stack {
+  flex: 1;
+  position: relative;
+  min-height: 0;
+}
+.hg-term-stack > div {
+  position: absolute;
+  inset: 0;
+}
+.hg-viewer {
+  position: absolute;
+  inset: 0;
+  background: #000;
+  display: flex;
+  flex-direction: column;
+  z-index: 5;
+}
+.hg-viewer-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  border-bottom: 1px solid #2f3336;
+}
+.hg-viewer-body {
+  flex: 1;
+  margin: 0;
+  padding: 12px;
+  overflow: auto;
+  font-family: ui-monospace, monospace;
+  font-size: 12.5px;
+  color: #e7e9ea;
+  white-space: pre;
+}
+
+/* file tree */
+.hg-tree {
+  font-size: 13px;
+}
+.hg-tree-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  color: #71767b;
+  text-transform: uppercase;
+  font-size: 11px;
+  letter-spacing: 0.05em;
+}
+.hg-tree-body {
+  padding-bottom: 12px;
+}
+.hg-tree-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  width: 100%;
+  background: transparent;
+  border: none;
+  color: #e7e9ea;
+  padding: 3px 8px;
+  cursor: pointer;
+  text-align: left;
+  font-size: 13px;
+}
+.hg-tree-row:hover {
+  background: #1d1f23;
+}
+.hg-tree-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hg-tree-muted {
+  color: #71767b;
+  font-size: 12px;
+  padding: 2px 8px;
+}

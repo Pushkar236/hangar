@@ -4,38 +4,41 @@ import { WebSocketServer, WebSocket } from "ws";
 import { Sandbox } from "e2b";
 
 /**
- * Hangar orchestrator.
+ * Hangar orchestrator (Phase 2).
  *
- * Bridges a browser terminal (xterm.js over a WebSocket) to an interactive
- * PTY inside an E2B sandbox that has Claude Code preinstalled. One WebSocket
- * connection == one terminal == one PTY. The user's Anthropic credential is
- * received over the (WSS) connection, injected into the sandbox env, and is
- * NEVER written to disk, persisted, or logged — session-only by design.
+ * One WebSocket connection == one project == one E2B sandbox. Within that
+ * sandbox the client can open MULTIPLE terminals (tabs) — each a PTY running
+ * Claude Code — multiplexed over the single socket by `terminalId`. The client
+ * can also browse the sandbox filesystem (the file tree).
  *
- * This must run on a persistent host (Fly.io), NOT Vercel: it holds long-lived
- * WebSockets and manages sandbox lifecycles.
+ * The user's Anthropic credential is received over WSS, injected into the
+ * sandbox env, and is NEVER persisted or logged (session-only).
  */
 
 const PORT = Number(process.env.PORT) || 8080;
-// If a prebuilt template (with Claude Code baked in) is published, set
-// E2B_TEMPLATE to its name to skip the per-session install. Otherwise we use
-// the default `base` sandbox (Node + npm preinstalled) and install Claude Code
-// at session start — no template build required for the MVP.
 const CUSTOM_TEMPLATE =
   process.env.E2B_TEMPLATE && process.env.E2B_TEMPLATE !== "base"
     ? process.env.E2B_TEMPLATE
     : null;
-// Cap a sandbox's life so an abandoned tab can't run up cost. Refreshed on
-// activity via sandbox.setTimeout.
 const SANDBOX_TIMEOUT_MS = Number(process.env.SANDBOX_TIMEOUT_MS) || 10 * 60 * 1000;
+const HOME = "/home/user";
+
+// Pre-seed so Claude Code skips onboarding + the trust dialog (lands at prompt).
+const CLAUDE_CONFIG = JSON.stringify({
+  hasCompletedOnboarding: true,
+  theme: "dark",
+  projects: { [HOME]: { hasTrustDialogAccepted: true } },
+});
 
 type ClientMessage =
-  | { type: "start"; auth: string; cols?: number; rows?: number; autostart?: boolean }
-  | { type: "input"; data: string }
-  | { type: "resize"; cols: number; rows: number };
+  | { type: "start"; auth: string; cols?: number; rows?: number }
+  | { type: "open"; terminalId: string; cols?: number; rows?: number }
+  | { type: "input"; terminalId: string; data: string }
+  | { type: "resize"; terminalId: string; cols: number; rows: number }
+  | { type: "close"; terminalId: string }
+  | { type: "fs.list"; path?: string }
+  | { type: "fs.read"; path: string };
 
-// A tiny HTTP server so hosts (Render/Fly/etc.) get a health endpoint; the
-// WebSocket server shares the same port via the HTTP upgrade.
 const httpServer = createServer((req, res) => {
   if (req.url === "/health" || req.url === "/") {
     res.writeHead(200, { "Content-Type": "text/plain" });
@@ -50,9 +53,10 @@ const wss = new WebSocketServer({ server: httpServer });
 
 wss.on("connection", (ws: WebSocket) => {
   let sandbox: Sandbox | null = null;
-  let pid: number | null = null;
+  let auth = "";
   let starting = false;
   let closed = false;
+  const pids = new Map<string, number>(); // terminalId -> pty pid
 
   const send = (obj: Record<string, unknown>) => {
     if (ws.readyState === ws.OPEN) ws.send(JSON.stringify(obj));
@@ -63,14 +67,25 @@ wss.on("connection", (ws: WebSocket) => {
     closed = true;
     const sb = sandbox;
     sandbox = null;
-    pid = null;
-    if (sb) {
-      try {
-        await sb.kill();
-      } catch {
-        /* best effort */
-      }
-    }
+    pids.clear();
+    if (sb) await sb.kill().catch(() => {});
+  };
+
+  // Open one PTY (a Claude Code agent) in the sandbox, tagged by terminalId.
+  const openTerminal = async (terminalId: string, cols: number, rows: number) => {
+    if (!sandbox || pids.has(terminalId)) return;
+    const handle = await sandbox.pty.create({
+      cols,
+      rows,
+      envs: auth.startsWith("sk-ant-oat")
+        ? { TERM: "xterm-256color", CLAUDE_CODE_OAUTH_TOKEN: auth }
+        : { TERM: "xterm-256color", ANTHROPIC_API_KEY: auth },
+      onData: (data: Uint8Array) =>
+        send({ type: "data", terminalId, data: Buffer.from(data).toString("base64") }),
+    });
+    pids.set(terminalId, handle.pid);
+    send({ type: "terminalReady", terminalId });
+    await sandbox.pty.sendInput(handle.pid, new TextEncoder().encode("claude\n"));
   };
 
   ws.on("message", async (raw) => {
@@ -81,95 +96,88 @@ wss.on("connection", (ws: WebSocket) => {
       return;
     }
 
-    if (msg.type === "start") {
-      if (sandbox || starting) return;
-      starting = true;
-      const auth = String(msg.auth || "").trim();
-      if (!auth) {
-        send({ type: "error", message: "missing credential" });
-        ws.close();
+    try {
+      if (msg.type === "start") {
+        if (sandbox || starting) return;
+        starting = true;
+        auth = String(msg.auth || "").trim();
+        if (!auth) {
+          send({ type: "error", message: "missing credential" });
+          ws.close();
+          return;
+        }
+        try {
+          send({ type: "status", message: "Provisioning sandbox & installing Claude Code…" });
+          sandbox = CUSTOM_TEMPLATE
+            ? await Sandbox.create(CUSTOM_TEMPLATE, { timeoutMs: SANDBOX_TIMEOUT_MS })
+            : await Sandbox.create({ timeoutMs: SANDBOX_TIMEOUT_MS });
+          if (!CUSTOM_TEMPLATE) {
+            await sandbox.commands.run("npm install -g @anthropic-ai/claude-code", {
+              timeoutMs: 240_000,
+            });
+          }
+          await sandbox.files.write(`${HOME}/.claude.json`, CLAUDE_CONFIG).catch(() => {});
+          send({ type: "ready", sandboxId: sandbox.sandboxId });
+          await openTerminal("t1", msg.cols ?? 80, msg.rows ?? 24);
+        } catch (err) {
+          console.error("[start] failed:", err);
+          send({ type: "error", message: `failed to start: ${String(err).slice(0, 300)}` });
+          await cleanup();
+          ws.close();
+        } finally {
+          starting = false;
+        }
         return;
       }
-      // Route the credential to the right env var WITHOUT ever logging it.
-      // sk-ant-oat... = Claude subscription OAuth token; otherwise an API key.
-      const envs: Record<string, string> = { TERM: "xterm-256color" };
-      if (auth.startsWith("sk-ant-oat")) envs.CLAUDE_CODE_OAUTH_TOKEN = auth;
-      else envs.ANTHROPIC_API_KEY = auth;
 
-      try {
-        sandbox = CUSTOM_TEMPLATE
-          ? await Sandbox.create(CUSTOM_TEMPLATE, { timeoutMs: SANDBOX_TIMEOUT_MS })
-          : await Sandbox.create({ timeoutMs: SANDBOX_TIMEOUT_MS });
-        // Install Claude Code on the default base template (skipped if a
-        // prebuilt template already has it).
-        if (!CUSTOM_TEMPLATE) {
-          send({ type: "status", message: "Provisioning sandbox & installing Claude Code…" });
-          await sandbox.commands.run("npm install -g @anthropic-ai/claude-code", {
-            timeoutMs: 240_000,
-          });
+      if (!sandbox) return;
+
+      switch (msg.type) {
+        case "open":
+          await openTerminal(msg.terminalId, msg.cols ?? 80, msg.rows ?? 24);
+          await sandbox.setTimeout(SANDBOX_TIMEOUT_MS);
+          break;
+        case "input": {
+          const pid = pids.get(msg.terminalId);
+          if (pid != null) {
+            await sandbox.pty.sendInput(pid, new TextEncoder().encode(msg.data));
+            await sandbox.setTimeout(SANDBOX_TIMEOUT_MS);
+          }
+          break;
         }
-        // Pre-seed Claude config so the agent skips its one-time onboarding
-        // (theme picker + welcome) and the workspace-trust prompt, landing the
-        // user straight at the prompt. Normal permission behavior is unchanged
-        // (no --dangerously-skip-permissions). Discovered empirically — see the
-        // probe in commit history; `hasTrustDialogAccepted` is keyed by cwd.
-        await sandbox.files
-          .write(
-            "/home/user/.claude.json",
-            JSON.stringify({
-              hasCompletedOnboarding: true,
-              theme: "dark",
-              projects: { "/home/user": { hasTrustDialogAccepted: true } },
-            }),
-          )
-          .catch(() => {
-            /* non-fatal: worst case the user sees onboarding once */
-          });
-
-        const handle = await sandbox.pty.create({
-          cols: msg.cols ?? 80,
-          rows: msg.rows ?? 24,
-          envs,
-          onData: (data: Uint8Array) =>
-            send({ type: "data", data: Buffer.from(data).toString("base64") }),
-        });
-        pid = handle.pid;
-        send({ type: "ready" });
-        // Drop the user straight into Claude Code.
-        if (msg.autostart !== false && pid != null) {
-          await sandbox.pty.sendInput(pid, new TextEncoder().encode("claude\n"));
+        case "resize": {
+          const pid = pids.get(msg.terminalId);
+          if (pid != null) await sandbox.pty.resize(pid, { cols: msg.cols, rows: msg.rows });
+          break;
         }
-      } catch (err) {
-        // Log the real reason server-side (never contains the credential) and
-        // surface a trimmed message to the client so failures are debuggable.
-        console.error("[start] failed:", err);
-        send({
-          type: "error",
-          message: `failed to start: ${String(err).slice(0, 300)}`,
-        });
-        await cleanup();
-        ws.close();
-      } finally {
-        starting = false;
+        case "close": {
+          const pid = pids.get(msg.terminalId);
+          if (pid != null) {
+            pids.delete(msg.terminalId);
+            await sandbox.pty.kill(pid).catch(() => {});
+          }
+          break;
+        }
+        case "fs.list": {
+          const path = msg.path || HOME;
+          const entries = await sandbox.files.list(path);
+          send({
+            type: "fs.dir",
+            path,
+            entries: entries
+              .map((e) => ({ name: e.name, path: e.path, dir: e.type === "dir" }))
+              .sort((a, b) => Number(b.dir) - Number(a.dir) || a.name.localeCompare(b.name)),
+          });
+          break;
+        }
+        case "fs.read": {
+          const content = await sandbox.files.read(msg.path);
+          send({ type: "fs.file", path: msg.path, content: String(content).slice(0, 200_000) });
+          break;
+        }
       }
-      return;
-    }
-
-    if (!sandbox || pid == null) return;
-
-    if (msg.type === "input") {
-      try {
-        await sandbox.pty.sendInput(pid, new TextEncoder().encode(msg.data));
-        await sandbox.setTimeout(SANDBOX_TIMEOUT_MS); // keep-alive on activity
-      } catch {
-        /* ignore transient input errors */
-      }
-    } else if (msg.type === "resize") {
-      try {
-        await sandbox.pty.resize(pid, { cols: msg.cols, rows: msg.rows });
-      } catch {
-        /* ignore */
-      }
+    } catch (err) {
+      send({ type: "error", message: String(err).slice(0, 200) });
     }
   });
 
