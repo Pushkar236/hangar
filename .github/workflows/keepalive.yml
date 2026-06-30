@@ -1,0 +1,27 @@
+name: keep-alive
+
+# Pings the orchestrator's /health endpoint so Render's free tier doesn't sleep
+# (avoids the ~30-60s cold start on first use). Runs on GitHub's infra, free for
+# public repos — no UptimeRobot needed.
+#
+# NOTE (cost): keeping the service always-awake consumes Render free-tier
+# instance-hours (~750/mo per account). If you also keep `ongo-brain` always-on,
+# two services can exceed that. Disable this workflow (Actions tab → keep-alive →
+# ••• → Disable workflow) if your free hours run low.
+#
+# NOTE (reliability): GitHub may delay scheduled runs under load, so this is
+# best-effort. For rock-solid uptime, add an UptimeRobot HTTP monitor too.
+
+on:
+  schedule:
+    - cron: "*/10 * * * *" # every 10 minutes
+  workflow_dispatch: {} # allow manual runs
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping orchestrator health
+        run: |
+          curl -fsS --max-time 30 https://hangar-orchestrator.onrender.com/health \
+            && echo "ok $(date -u)" || echo "ping failed (non-fatal)"
