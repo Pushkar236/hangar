@@ -31,7 +31,7 @@ const CLAUDE_CONFIG = JSON.stringify({
 });
 
 type ClientMessage =
-  | { type: "start"; auth: string; cols?: number; rows?: number }
+  | { type: "start"; auth: string; cols?: number; rows?: number; resume?: string }
   | { type: "open"; terminalId: string; cols?: number; rows?: number }
   | { type: "input"; terminalId: string; data: string }
   | { type: "resize"; terminalId: string; cols: number; rows: number }
@@ -62,13 +62,15 @@ wss.on("connection", (ws: WebSocket) => {
     if (ws.readyState === ws.OPEN) ws.send(JSON.stringify(obj));
   };
 
+  // On disconnect we PAUSE (persist the filesystem) instead of killing, so the
+  // user's project survives across sessions and resumes on return.
   const cleanup = async () => {
     if (closed) return;
     closed = true;
     const sb = sandbox;
     sandbox = null;
     pids.clear();
-    if (sb) await sb.kill().catch(() => {});
+    if (sb) await sb.pause().catch(() => sb.kill().catch(() => {}));
   };
 
   // Open one PTY (a Claude Code agent) in the sandbox, tagged by terminalId.
@@ -107,17 +109,32 @@ wss.on("connection", (ws: WebSocket) => {
           return;
         }
         try {
-          send({ type: "status", message: "Provisioning sandbox & installing Claude Code…" });
-          sandbox = CUSTOM_TEMPLATE
-            ? await Sandbox.create(CUSTOM_TEMPLATE, { timeoutMs: SANDBOX_TIMEOUT_MS })
-            : await Sandbox.create({ timeoutMs: SANDBOX_TIMEOUT_MS });
-          if (!CUSTOM_TEMPLATE) {
-            await sandbox.commands.run("npm install -g @anthropic-ai/claude-code", {
-              timeoutMs: 240_000,
-            });
+          const resumeId = typeof msg.resume === "string" ? msg.resume.trim() : "";
+          let resumed = false;
+          // Try to resume a previously-paused sandbox (its files + the installed
+          // Claude Code persist). Falls back to a fresh sandbox if it's gone.
+          if (resumeId) {
+            send({ type: "status", message: "Resuming your project…" });
+            try {
+              sandbox = await Sandbox.connect(resumeId, { timeoutMs: SANDBOX_TIMEOUT_MS });
+              resumed = true;
+            } catch {
+              sandbox = null;
+            }
           }
-          await sandbox.files.write(`${HOME}/.claude.json`, CLAUDE_CONFIG).catch(() => {});
-          send({ type: "ready", sandboxId: sandbox.sandboxId });
+          if (!sandbox) {
+            send({ type: "status", message: "Provisioning sandbox & installing Claude Code…" });
+            sandbox = CUSTOM_TEMPLATE
+              ? await Sandbox.create(CUSTOM_TEMPLATE, { timeoutMs: SANDBOX_TIMEOUT_MS })
+              : await Sandbox.create({ timeoutMs: SANDBOX_TIMEOUT_MS });
+            if (!CUSTOM_TEMPLATE) {
+              await sandbox.commands.run("npm install -g @anthropic-ai/claude-code", {
+                timeoutMs: 240_000,
+              });
+            }
+            await sandbox.files.write(`${HOME}/.claude.json`, CLAUDE_CONFIG).catch(() => {});
+          }
+          send({ type: "ready", sandboxId: sandbox.sandboxId, resumed });
           await openTerminal("t1", msg.cols ?? 80, msg.rows ?? 24);
         } catch (err) {
           console.error("[start] failed:", err);

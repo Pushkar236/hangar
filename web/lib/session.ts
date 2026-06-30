@@ -9,10 +9,12 @@ export class HangarSession {
   private listeners = new Set<(m: ControlMsg) => void>();
   sandboxId: string | null = null;
 
-  constructor(url: string, auth: string) {
+  constructor(url: string, auth: string, resume?: string) {
     this.ws = new WebSocket(url);
     this.ws.onopen = () =>
-      this.ws.send(JSON.stringify({ type: "start", auth, cols: 80, rows: 24 }));
+      this.ws.send(
+        JSON.stringify({ type: "start", auth, resume, cols: 80, rows: 24 }),
+      );
     this.ws.onmessage = (ev) => {
       let m: ControlMsg;
       try {

@@ -1,5 +1,15 @@
 :root {
   color-scheme: dark;
+  --bg: #000000;
+  --surface: #0e0f12;
+  --surface-2: #16181c;
+  --border: #2a2d31;
+  --text: #e7e9ea;
+  --muted: #8b8f95;
+  --blue: #1d9bf0;
+  --green: #00ba7c;
+  --amber: #f5c518;
+  --red: #f4212e;
 }
 
 * {
@@ -10,8 +20,8 @@ html,
 body {
   margin: 0;
   height: 100%;
-  background: #000000;
-  color: #e7e9ea;
+  background: var(--bg);
+  color: var(--text);
   font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
 }
 
@@ -20,97 +30,164 @@ body > div {
   height: 100%;
 }
 
+/* ── Launch screen ─────────────────────────────────────────────────────── */
 .hangar-input {
   width: 100%;
-  border: 1px solid #2f3336;
-  background: #000;
-  color: #e7e9ea;
-  border-radius: 8px;
-  padding: 12px 14px;
+  border: 1px solid var(--border);
+  background: #08090b;
+  color: var(--text);
+  border-radius: 10px;
+  padding: 13px 14px;
   font-size: 15px;
   outline: none;
+  transition: border-color 0.15s;
 }
 .hangar-input:focus {
-  border-color: #1d9bf0;
+  border-color: var(--blue);
 }
-
 .hangar-btn {
-  background: #1d9bf0;
+  background: var(--blue);
   color: #fff;
   border: none;
   border-radius: 9999px;
-  padding: 12px 20px;
+  padding: 13px 20px;
   font-weight: 700;
   font-size: 15px;
   cursor: pointer;
+  transition: background 0.15s, transform 0.05s;
+}
+.hangar-btn:hover:not(:disabled) {
+  background: #1a8cd8;
+}
+.hangar-btn:active:not(:disabled) {
+  transform: translateY(1px);
 }
 .hangar-btn:disabled {
-  opacity: 0.5;
+  opacity: 0.45;
   cursor: not-allowed;
 }
 .hangar-muted {
-  color: #71767b;
+  color: var(--muted);
   font-size: 13px;
 }
 
-/* ── Workbench (VS Code-style) ─────────────────────────────────────────── */
+/* ── Workbench ─────────────────────────────────────────────────────────── */
 .hg-app {
   height: 100vh;
   display: flex;
   flex-direction: column;
+  background: var(--bg);
 }
 .hg-header {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   padding: 8px 12px;
-  border-bottom: 1px solid #2f3336;
+  background: linear-gradient(#0c0d10, #08090b);
+  border-bottom: 1px solid var(--border);
 }
-.hg-muted {
-  color: #71767b;
-  font-size: 13px;
+.hg-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: var(--text);
 }
-.hg-btn-end {
+.hg-brand svg {
+  color: var(--blue);
+}
+.hg-header-right {
   margin-left: auto;
+  display: flex;
+  gap: 6px;
+}
+.hg-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 4px 11px;
+  border-radius: 9999px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  font-size: 12.5px;
+  color: var(--muted);
+  max-width: 42ch;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.hg-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 9999px;
+  flex-shrink: 0;
+  background: var(--muted);
+}
+.hg-dot.ok,
+.hg-pill.ok .hg-dot {
+  background: var(--green);
+  box-shadow: 0 0 8px var(--green);
+}
+.hg-dot.bad,
+.hg-pill.bad .hg-dot {
+  background: var(--red);
+}
+.hg-dot.wait,
+.hg-pill.wait .hg-dot {
+  background: var(--amber);
+  animation: hg-pulse 1.2s ease-in-out infinite;
+}
+@keyframes hg-pulse {
+  50% {
+    opacity: 0.3;
+  }
+}
+.hg-btn-ghost {
   display: inline-flex;
   align-items: center;
   gap: 6px;
   background: transparent;
-  color: #e7e9ea;
-  border: 1px solid #2f3336;
+  color: var(--text);
+  border: 1px solid var(--border);
   border-radius: 9999px;
-  padding: 5px 12px;
+  padding: 6px 13px;
   font-size: 13px;
+  font-weight: 600;
   cursor: pointer;
+  transition: background 0.12s, border-color 0.12s;
 }
-.hg-btn-end:hover {
-  background: #1d1f23;
+.hg-btn-ghost:hover {
+  background: var(--surface-2);
+  border-color: #3a3d42;
 }
 .hg-icon-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   background: transparent;
-  color: #e7e9ea;
+  color: var(--text);
   border: none;
-  border-radius: 6px;
+  border-radius: 8px;
   padding: 6px;
   cursor: pointer;
+  transition: background 0.12s;
 }
 .hg-icon-btn:hover {
-  background: #1d1f23;
+  background: var(--surface-2);
 }
+
 .hg-body {
   flex: 1;
   display: flex;
   min-height: 0;
 }
 .hg-sidebar {
-  width: 240px;
+  width: 248px;
   flex-shrink: 0;
-  border-right: 1px solid #2f3336;
+  border-right: 1px solid var(--border);
   overflow-y: auto;
-  background: #0a0a0a;
+  background: var(--surface);
 }
 .hg-main {
   flex: 1;
@@ -122,25 +199,35 @@ body > div {
 .hg-tabs {
   display: flex;
   align-items: center;
-  gap: 2px;
-  padding: 4px 6px;
-  border-bottom: 1px solid #2f3336;
+  gap: 3px;
+  padding: 6px 8px;
+  background: #08090b;
+  border-bottom: 1px solid var(--border);
   overflow-x: auto;
 }
 .hg-tab {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 5px 10px;
-  border-radius: 8px;
+  gap: 7px;
+  padding: 6px 11px;
+  border-radius: 9px;
   font-size: 13px;
-  color: #71767b;
+  color: var(--muted);
   cursor: pointer;
   white-space: nowrap;
+  border: 1px solid transparent;
+  transition: background 0.12s, color 0.12s;
+}
+.hg-tab:hover {
+  color: var(--text);
 }
 .hg-tab.active {
-  background: #16181c;
-  color: #e7e9ea;
+  background: var(--surface-2);
+  color: var(--text);
+  border-color: var(--border);
+}
+.hg-tab.active svg {
+  color: var(--blue);
 }
 .hg-tab-x {
   display: inline-flex;
@@ -149,15 +236,18 @@ body > div {
   color: inherit;
   cursor: pointer;
   padding: 0;
-  opacity: 0.6;
+  border-radius: 4px;
+  opacity: 0.5;
 }
 .hg-tab-x:hover {
   opacity: 1;
+  background: #2a2d31;
 }
 .hg-term-stack {
   flex: 1;
   position: relative;
   min-height: 0;
+  background: var(--bg);
 }
 .hg-term-stack > div {
   position: absolute;
@@ -166,7 +256,7 @@ body > div {
 .hg-viewer {
   position: absolute;
   inset: 0;
-  background: #000;
+  background: var(--surface);
   display: flex;
   flex-direction: column;
   z-index: 5;
@@ -175,18 +265,37 @@ body > div {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 6px 10px;
-  border-bottom: 1px solid #2f3336;
+  padding: 7px 12px;
+  border-bottom: 1px solid var(--border);
+  background: #08090b;
 }
 .hg-viewer-body {
   flex: 1;
   margin: 0;
-  padding: 12px;
+  padding: 14px;
   overflow: auto;
   font-family: ui-monospace, monospace;
   font-size: 12.5px;
-  color: #e7e9ea;
+  line-height: 1.5;
+  color: var(--text);
   white-space: pre;
+}
+
+.hg-statusbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 5px 12px;
+  font-size: 12px;
+  color: var(--text);
+  background: #08090b;
+  border-top: 1px solid var(--border);
+}
+.hg-statusbar .hg-muted {
+  font-size: 12px;
+}
+.hg-right {
+  margin-left: auto;
 }
 
 /* file tree */
@@ -194,17 +303,21 @@ body > div {
   font-size: 13px;
 }
 .hg-tree-head {
+  position: sticky;
+  top: 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8px 10px;
-  color: #71767b;
+  padding: 10px 10px 8px;
+  color: var(--muted);
   text-transform: uppercase;
   font-size: 11px;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.06em;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
 }
 .hg-tree-body {
-  padding-bottom: 12px;
+  padding: 6px 0 16px;
 }
 .hg-tree-row {
   display: flex;
@@ -213,14 +326,18 @@ body > div {
   width: 100%;
   background: transparent;
   border: none;
-  color: #e7e9ea;
+  color: var(--text);
   padding: 3px 8px;
   cursor: pointer;
   text-align: left;
   font-size: 13px;
 }
 .hg-tree-row:hover {
-  background: #1d1f23;
+  background: var(--surface-2);
+}
+.hg-tree-row svg {
+  color: var(--muted);
+  flex-shrink: 0;
 }
 .hg-tree-name {
   overflow: hidden;
@@ -228,7 +345,7 @@ body > div {
   white-space: nowrap;
 }
 .hg-tree-muted {
-  color: #71767b;
+  color: var(--muted);
   font-size: 12px;
   padding: 2px 8px;
 }
