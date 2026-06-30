@@ -71,6 +71,76 @@ body > div {
   font-size: 13px;
 }
 
+/* ── Auth + dashboard ──────────────────────────────────────────────────── */
+.hg-center {
+  height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+.hg-dash {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+.hg-dash-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 18px;
+  border-bottom: 1px solid var(--border);
+  background: #08090b;
+}
+.hg-dash-body {
+  flex: 1;
+  width: 100%;
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 36px 20px;
+}
+.hg-newproj {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 24px;
+}
+.hg-proj-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.hg-proj {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+  transition: border-color 0.12s;
+}
+.hg-proj:hover {
+  border-color: #3a3d42;
+}
+.hg-modal-bg {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  z-index: 50;
+}
+.hg-modal {
+  width: 100%;
+  max-width: 420px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 22px;
+}
+
 /* ── Workbench ─────────────────────────────────────────────────────────── */
 .hg-app {
   height: 100vh;

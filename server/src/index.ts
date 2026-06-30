@@ -1,37 +1,110 @@
 import "dotenv/config";
 import { createServer } from "node:http";
+import express from "express";
+import cors from "cors";
 import { WebSocketServer, WebSocket } from "ws";
 import { Sandbox } from "e2b";
+import { pool, initDb } from "./db.js";
+import { signup, login, getUser, verifyToken, userIdFromHeader } from "./auth.js";
 
 /**
- * Hangar orchestrator (Phase 2).
+ * Hangar orchestrator (Phase 3).
  *
- * One WebSocket connection == one project == one E2B sandbox. Within that
- * sandbox the client can open MULTIPLE terminals (tabs) — each a PTY running
- * Claude Code — multiplexed over the single socket by `terminalId`. The client
- * can also browse the sandbox filesystem (the file tree).
- *
- * The user's Anthropic credential is received over WSS, injected into the
- * sandbox env, and is NEVER persisted or logged (session-only).
+ * HTTP API (Express): email/password auth (JWT) + per-user projects.
+ * WebSocket: JWT-gated, project-scoped. One connection == one project ==
+ * one E2B sandbox; multiple PTYs (Claude agents) multiplexed by terminalId,
+ * plus a file API. Sandboxes pause on disconnect (persist) and resume by id.
  */
 
 const PORT = Number(process.env.PORT) || 8080;
 const CUSTOM_TEMPLATE =
-  process.env.E2B_TEMPLATE && process.env.E2B_TEMPLATE !== "base"
-    ? process.env.E2B_TEMPLATE
-    : null;
+  process.env.E2B_TEMPLATE && process.env.E2B_TEMPLATE !== "base" ? process.env.E2B_TEMPLATE : null;
 const SANDBOX_TIMEOUT_MS = Number(process.env.SANDBOX_TIMEOUT_MS) || 10 * 60 * 1000;
 const HOME = "/home/user";
-
-// Pre-seed so Claude Code skips onboarding + the trust dialog (lands at prompt).
 const CLAUDE_CONFIG = JSON.stringify({
   hasCompletedOnboarding: true,
   theme: "dark",
   projects: { [HOME]: { hasTrustDialogAccepted: true } },
 });
 
+// ── HTTP API ───────────────────────────────────────────────────────────────
+const app = express();
+app.use(cors());
+app.use(express.json());
+
+app.get("/health", (_req, res) => res.send("ok"));
+
+app.post("/api/auth/signup", async (req, res) => {
+  try {
+    res.json(await signup(req.body?.email, req.body?.password));
+  } catch (e) {
+    res.status(400).json({ error: String((e as Error).message || e) });
+  }
+});
+app.post("/api/auth/login", async (req, res) => {
+  try {
+    res.json(await login(req.body?.email, req.body?.password));
+  } catch (e) {
+    res.status(400).json({ error: String((e as Error).message || e) });
+  }
+});
+app.get("/api/auth/me", async (req, res) => {
+  const userId = userIdFromHeader(req.headers.authorization);
+  if (!userId) return res.status(401).json({ error: "unauthorized" });
+  const user = await getUser(userId);
+  return user ? res.json({ user }) : res.status(401).json({ error: "unauthorized" });
+});
+
+// Projects (all require auth)
+app.use("/api/projects", (req, res, next) => {
+  const userId = userIdFromHeader(req.headers.authorization);
+  if (!userId) return res.status(401).json({ error: "unauthorized" });
+  (req as unknown as { userId: string }).userId = userId;
+  next();
+});
+app.get("/api/projects", async (req, res) => {
+  const userId = (req as unknown as { userId: string }).userId;
+  const r = await pool.query(
+    "SELECT id, name, sandbox_id, created_at, updated_at FROM projects WHERE user_id=$1 ORDER BY updated_at DESC",
+    [userId],
+  );
+  res.json({ projects: r.rows });
+});
+app.post("/api/projects", async (req, res) => {
+  const userId = (req as unknown as { userId: string }).userId;
+  const name = String(req.body?.name || "Untitled").slice(0, 80);
+  const { randomUUID } = await import("node:crypto");
+  const id = randomUUID();
+  await pool.query("INSERT INTO projects (id, user_id, name) VALUES ($1,$2,$3)", [id, userId, name]);
+  res.json({ project: { id, name, sandbox_id: null } });
+});
+app.delete("/api/projects/:id", async (req, res) => {
+  const userId = (req as unknown as { userId: string }).userId;
+  const r = await pool.query("SELECT sandbox_id FROM projects WHERE id=$1 AND user_id=$2", [
+    req.params.id,
+    userId,
+  ]);
+  if (r.rowCount) {
+    const sid = r.rows[0].sandbox_id as string | null;
+    if (sid) {
+      try {
+        const sb = await Sandbox.connect(sid);
+        await sb.kill();
+      } catch {
+        /* already gone */
+      }
+    }
+    await pool.query("DELETE FROM projects WHERE id=$1 AND user_id=$2", [req.params.id, userId]);
+  }
+  res.json({ ok: true });
+});
+
+// ── WebSocket (project-scoped) ───────────────────────────────────────────────
+const httpServer = createServer(app);
+const wss = new WebSocketServer({ server: httpServer });
+
 type ClientMessage =
-  | { type: "start"; auth: string; cols?: number; rows?: number; resume?: string }
+  | { type: "start"; token: string; projectId: string; cols?: number; rows?: number }
   | { type: "open"; terminalId: string; cols?: number; rows?: number }
   | { type: "input"; terminalId: string; data: string }
   | { type: "resize"; terminalId: string; cols: number; rows: number }
@@ -39,31 +112,17 @@ type ClientMessage =
   | { type: "fs.list"; path?: string }
   | { type: "fs.read"; path: string };
 
-const httpServer = createServer((req, res) => {
-  if (req.url === "/health" || req.url === "/") {
-    res.writeHead(200, { "Content-Type": "text/plain" });
-    res.end("ok");
-  } else {
-    res.writeHead(404);
-    res.end();
-  }
-});
-
-const wss = new WebSocketServer({ server: httpServer });
-
 wss.on("connection", (ws: WebSocket) => {
   let sandbox: Sandbox | null = null;
-  let auth = "";
+  let auth = ""; // not used for creds anymore — Claude auth comes from the env on the sandbox? see note
+  let projectId = "";
   let starting = false;
   let closed = false;
-  const pids = new Map<string, number>(); // terminalId -> pty pid
+  const pids = new Map<string, number>();
 
   const send = (obj: Record<string, unknown>) => {
     if (ws.readyState === ws.OPEN) ws.send(JSON.stringify(obj));
   };
-
-  // On disconnect we PAUSE (persist the filesystem) instead of killing, so the
-  // user's project survives across sessions and resumes on return.
   const cleanup = async () => {
     if (closed) return;
     closed = true;
@@ -72,8 +131,6 @@ wss.on("connection", (ws: WebSocket) => {
     pids.clear();
     if (sb) await sb.pause().catch(() => sb.kill().catch(() => {}));
   };
-
-  // Open one PTY (a Claude Code agent) in the sandbox, tagged by terminalId.
   const openTerminal = async (terminalId: string, cols: number, rows: number) => {
     if (!sandbox || pids.has(terminalId)) return;
     const handle = await sandbox.pty.create({
@@ -91,32 +148,43 @@ wss.on("connection", (ws: WebSocket) => {
   };
 
   ws.on("message", async (raw) => {
-    let msg: ClientMessage;
+    let msg: ClientMessage & { auth?: string };
     try {
       msg = JSON.parse(raw.toString());
     } catch {
       return;
     }
-
     try {
       if (msg.type === "start") {
         if (sandbox || starting) return;
         starting = true;
+        const userId = verifyToken(msg.token);
+        // The Claude credential still rides along (session-only) for the agent.
         auth = String(msg.auth || "").trim();
-        if (!auth) {
-          send({ type: "error", message: "missing credential" });
+        if (!userId) {
+          send({ type: "error", message: "unauthorized" });
           ws.close();
+          starting = false;
           return;
         }
+        const pr = await pool.query<{ sandbox_id: string | null }>(
+          "SELECT sandbox_id FROM projects WHERE id=$1 AND user_id=$2",
+          [msg.projectId, userId],
+        );
+        if (!pr.rowCount) {
+          send({ type: "error", message: "project not found" });
+          ws.close();
+          starting = false;
+          return;
+        }
+        projectId = msg.projectId;
         try {
-          const resumeId = typeof msg.resume === "string" ? msg.resume.trim() : "";
+          const existing = pr.rows[0].sandbox_id;
           let resumed = false;
-          // Try to resume a previously-paused sandbox (its files + the installed
-          // Claude Code persist). Falls back to a fresh sandbox if it's gone.
-          if (resumeId) {
+          if (existing) {
             send({ type: "status", message: "Resuming your project…" });
             try {
-              sandbox = await Sandbox.connect(resumeId, { timeoutMs: SANDBOX_TIMEOUT_MS });
+              sandbox = await Sandbox.connect(existing, { timeoutMs: SANDBOX_TIMEOUT_MS });
               resumed = true;
             } catch {
               sandbox = null;
@@ -134,6 +202,10 @@ wss.on("connection", (ws: WebSocket) => {
             }
             await sandbox.files.write(`${HOME}/.claude.json`, CLAUDE_CONFIG).catch(() => {});
           }
+          await pool.query(
+            "UPDATE projects SET sandbox_id=$1, updated_at=now() WHERE id=$2",
+            [sandbox.sandboxId, projectId],
+          );
           send({ type: "ready", sandboxId: sandbox.sandboxId, resumed });
           await openTerminal("t1", msg.cols ?? 80, msg.rows ?? 24);
         } catch (err) {
@@ -202,8 +274,9 @@ wss.on("connection", (ws: WebSocket) => {
   ws.on("error", () => void cleanup());
 });
 
-httpServer.listen(PORT, () =>
-  console.log(
-    `hangar orchestrator listening on :${PORT} (template: ${CUSTOM_TEMPLATE ?? "base + runtime install"})`,
-  ),
-);
+initDb()
+  .then(() => httpServer.listen(PORT, () => console.log(`hangar listening on :${PORT}`)))
+  .catch((e) => {
+    console.error("DB init failed:", e);
+    process.exit(1);
+  });
