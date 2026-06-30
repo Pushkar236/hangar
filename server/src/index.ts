@@ -108,6 +108,24 @@ wss.on("connection", (ws: WebSocket) => {
             timeoutMs: 240_000,
           });
         }
+        // Pre-seed Claude config so the agent skips its one-time onboarding
+        // (theme picker + welcome) and the workspace-trust prompt, landing the
+        // user straight at the prompt. Normal permission behavior is unchanged
+        // (no --dangerously-skip-permissions). Discovered empirically — see the
+        // probe in commit history; `hasTrustDialogAccepted` is keyed by cwd.
+        await sandbox.files
+          .write(
+            "/home/user/.claude.json",
+            JSON.stringify({
+              hasCompletedOnboarding: true,
+              theme: "dark",
+              projects: { "/home/user": { hasTrustDialogAccepted: true } },
+            }),
+          )
+          .catch(() => {
+            /* non-fatal: worst case the user sees onboarding once */
+          });
+
         const handle = await sandbox.pty.create({
           cols: msg.cols ?? 80,
           rows: msg.rows ?? 24,
