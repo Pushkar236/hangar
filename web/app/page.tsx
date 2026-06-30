@@ -28,7 +28,8 @@ export default function Home() {
   if (booting)
     return (
       <main className="hg-center">
-        <p className="hangar-muted">Loading…</p>
+        <div className="hg-aurora" />
+        <div className="hg-spinner" />
       </main>
     );
   if (!user) return <AuthScreen onAuthed={setUser} />;

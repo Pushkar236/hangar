@@ -22,7 +22,8 @@ body {
   height: 100%;
   background: var(--bg);
   color: var(--text);
-  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
 }
 
 #__next,
@@ -147,6 +148,7 @@ body > div {
   display: flex;
   flex-direction: column;
   background: var(--bg);
+  position: relative;
 }
 .hg-header {
   display: flex;
@@ -510,4 +512,171 @@ body > div {
   color: var(--muted);
   font-size: 12px;
   padding: 2px 8px;
+}
+
+/* ════════ Aesthetic layer ════════════════════════════════════════════════ */
+
+/* Animated aurora background (auth / dashboard / boot) */
+.hg-aurora {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  z-index: -1;
+  pointer-events: none;
+  background: radial-gradient(circle at 50% 0%, #0b0e14 0%, #000 60%);
+}
+.hg-aurora::before,
+.hg-aurora::after {
+  content: "";
+  position: absolute;
+  width: 55vmax;
+  height: 55vmax;
+  border-radius: 50%;
+  filter: blur(90px);
+  opacity: 0.3;
+}
+.hg-aurora::before {
+  background: radial-gradient(circle, #1d9bf0, transparent 60%);
+  top: -18%;
+  left: -8%;
+  animation: hg-float1 20s ease-in-out infinite;
+}
+.hg-aurora::after {
+  background: radial-gradient(circle, #7856ff, transparent 60%);
+  bottom: -22%;
+  right: -8%;
+  animation: hg-float2 24s ease-in-out infinite;
+}
+@keyframes hg-float1 {
+  50% { transform: translate(7vw, 6vh) scale(1.12); }
+}
+@keyframes hg-float2 {
+  50% { transform: translate(-6vw, -5vh) scale(1.15); }
+}
+
+/* Spinner */
+.hg-spinner {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 3px solid rgba(255, 255, 255, 0.12);
+  border-top-color: var(--blue);
+  animation: hg-spin 0.8s linear infinite;
+}
+@keyframes hg-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Boot overlay */
+.hg-boot {
+  position: absolute;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 22px;
+  background: rgba(0, 0, 0, 0.72);
+  backdrop-filter: blur(10px);
+}
+.hg-boot-logo {
+  color: var(--blue);
+  filter: drop-shadow(0 0 18px rgba(29, 155, 240, 0.55));
+  animation: hg-glow 2.2s ease-in-out infinite;
+}
+@keyframes hg-glow {
+  50% { filter: drop-shadow(0 0 30px rgba(29, 155, 240, 0.95)); }
+}
+.hg-boot-status {
+  font-size: 14px;
+  color: var(--text);
+  min-height: 20px;
+}
+.hg-progress {
+  position: relative;
+  width: 260px;
+  height: 4px;
+  border-radius: 999px;
+  background: #16181c;
+  overflow: hidden;
+}
+.hg-progress-bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  width: 35%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, transparent, var(--blue), transparent);
+  animation: hg-indeterminate 1.3s ease-in-out infinite;
+}
+@keyframes hg-indeterminate {
+  0% { transform: translateX(-130%); }
+  100% { transform: translateX(360%); }
+}
+.hg-boot-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 4px;
+}
+.hg-step {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 13px;
+  color: var(--muted);
+  transition: color 0.2s;
+}
+.hg-step.done { color: var(--text); }
+.hg-step.active { color: var(--blue); }
+.hg-step-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+/* Skeleton shimmer */
+.hg-skel {
+  background: linear-gradient(90deg, #16181c 25%, #20242a 50%, #16181c 75%);
+  background-size: 200% 100%;
+  animation: hg-shimmer 1.3s infinite;
+  border-radius: 12px;
+}
+@keyframes hg-shimmer {
+  to { background-position: -200% 0; }
+}
+
+/* Premium button + input polish (override base) */
+.hangar-btn {
+  background: linear-gradient(180deg, #2aa3f2, #1a8cd8);
+  box-shadow: 0 4px 14px rgba(29, 155, 240, 0.32);
+  transition: transform 0.12s ease, box-shadow 0.12s ease, opacity 0.12s;
+}
+.hangar-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 7px 22px rgba(29, 155, 240, 0.5);
+  background: linear-gradient(180deg, #2aa3f2, #1d9bf0);
+}
+.hangar-input:focus {
+  box-shadow: 0 0 0 3px rgba(29, 155, 240, 0.16);
+}
+
+/* Auth/dashboard cards */
+.hg-card {
+  background: rgba(20, 22, 27, 0.7);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  backdrop-filter: blur(12px);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+.hg-proj {
+  transition: border-color 0.14s, transform 0.14s, box-shadow 0.14s;
+}
+.hg-proj:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45);
+  border-color: rgba(29, 155, 240, 0.5);
 }

@@ -2,11 +2,13 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Panel, PanelGroup, PanelResizeHandle, type ImperativePanelHandle } from "react-resizable-panels";
+import { AnimatePresence } from "framer-motion";
 import { PanelLeft, Plus, X, ArrowLeft, Hexagon, TerminalSquare } from "lucide-react";
 import { HangarSession } from "@/lib/session";
 import FileTree from "./FileTree";
 import XTerm from "./XTerm";
 import Editor, { type OpenFile } from "./Editor";
+import BootOverlay from "./BootOverlay";
 
 const WS_URL = process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:8080";
 type Phase = "connecting" | "provisioning" | "ready" | "error" | "closed";
@@ -140,6 +142,9 @@ export default function Workbench({
 
   return (
     <div className="hg-app">
+      <AnimatePresence>
+        {phase !== "ready" && <BootOverlay status={status} error={phase === "error"} />}
+      </AnimatePresence>
       <header className="hg-header">
         <button className="hg-icon-btn" onClick={onExit} title="Back to projects">
           <ArrowLeft size={18} />

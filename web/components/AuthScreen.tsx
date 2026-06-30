@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { motion } from "framer-motion";
 import { Hexagon } from "lucide-react";
 import { api, setToken, warmUp } from "@/lib/api";
 
@@ -16,8 +17,6 @@ export default function AuthScreen({
   const [busy, setBusy] = useState(false);
   const [slow, setSlow] = useState(false);
 
-  // Wake the free-tier server as soon as the screen loads, so it's warm by the
-  // time the user submits (avoids the "stuck button" cold-start feeling).
   useEffect(() => {
     warmUp();
   }, []);
@@ -42,11 +41,24 @@ export default function AuthScreen({
 
   return (
     <main className="hg-center">
-      <div style={{ width: "100%", maxWidth: 400 }}>
+      <div className="hg-aurora" />
+      <motion.div
+        className="hg-card"
+        initial={{ opacity: 0, y: 14, scale: 0.98 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        transition={{ duration: 0.4, ease: "easeOut" }}
+        style={{ width: "100%", maxWidth: 400, padding: 34 }}
+      >
         <div style={{ textAlign: "center", marginBottom: 26 }}>
-          <Hexagon size={40} fill="currentColor" style={{ color: "#1d9bf0" }} />
-          <h1 style={{ fontSize: 26, fontWeight: 800, margin: "12px 0 4px" }}>
-            {mode === "login" ? "Sign in to Hangar" : "Create your Hangar account"}
+          <motion.div
+            animate={{ scale: [1, 1.06, 1] }}
+            transition={{ duration: 2.4, repeat: Infinity, ease: "easeInOut" }}
+            style={{ display: "inline-block" }}
+          >
+            <Hexagon size={42} fill="currentColor" className="hg-boot-logo" />
+          </motion.div>
+          <h1 style={{ fontSize: 25, fontWeight: 800, margin: "14px 0 4px", letterSpacing: "-0.02em" }}>
+            {mode === "login" ? "Sign in to Hangar" : "Create your account"}
           </h1>
           <p className="hangar-muted">Cloud Claude Code agent terminals.</p>
         </div>
@@ -69,20 +81,22 @@ export default function AuthScreen({
             onChange={(e) => setPassword(e.target.value)}
             required
           />
-          {err && <p style={{ color: "#f4212e", fontSize: 13, margin: 0 }}>{err}</p>}
+          {err && <p style={{ color: "var(--red)", fontSize: 13, margin: 0 }}>{err}</p>}
           <button className="hangar-btn" disabled={busy} type="submit">
-            {busy
-              ? mode === "login"
-                ? "Signing in…"
-                : "Creating account…"
-              : mode === "login"
-                ? "Sign in"
-                : "Create account"}
+            {busy ? (
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 8, justifyContent: "center" }}>
+                <span className="hg-spinner" style={{ width: 16, height: 16, borderWidth: 2 }} />
+                {mode === "login" ? "Signing in…" : "Creating account…"}
+              </span>
+            ) : mode === "login" ? (
+              "Sign in"
+            ) : (
+              "Create account"
+            )}
           </button>
           {busy && slow && (
             <p className="hangar-muted" style={{ fontSize: 12, margin: 0, textAlign: "center" }}>
-              Waking the cloud server — the first request can take up to a minute
-              on the free tier. Hang tight…
+              Waking the cloud server — first request can take up to a minute on the free tier.
             </p>
           )}
         </form>
@@ -93,12 +107,12 @@ export default function AuthScreen({
               setMode(mode === "login" ? "signup" : "login");
               setErr("");
             }}
-            style={{ background: "none", border: "none", color: "#1d9bf0", cursor: "pointer", fontSize: 13 }}
+            style={{ background: "none", border: "none", color: "var(--blue)", cursor: "pointer", fontSize: 13 }}
           >
             {mode === "login" ? "Create an account" : "Sign in"}
           </button>
         </p>
-      </div>
+      </motion.div>
     </main>
   );
 }

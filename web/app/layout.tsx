@@ -1,17 +1,18 @@
 import type { Metadata } from "next";
+import { GeistSans } from "geist/font/sans";
+import { GeistMono } from "geist/font/mono";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Hangar — launch Claude Code agents in the cloud",
-  description:
-    "Bring your own Claude key and spin up terminals running Claude Code to build your project.",
+  title: "Hangar — cloud Claude Code agent terminals",
+  description: "Bring your own Claude key and build with multiple Claude Code agents in the cloud.",
 };
 
 export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en">
+    <html lang="en" className={`${GeistSans.variable} ${GeistMono.variable}`}>
       <body>{children}</body>
     </html>
   );
