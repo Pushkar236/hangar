@@ -5,7 +5,15 @@ import { Hexagon, AlertTriangle } from "lucide-react";
 
 const STEPS = ["Connecting", "Booting cloud sandbox", "Starting Claude Code"];
 
-export default function BootOverlay({ status, error }: { status: string; error?: boolean }) {
+export default function BootOverlay({
+  status,
+  error,
+  onRetry,
+}: {
+  status: string;
+  error?: boolean;
+  onRetry?: () => void;
+}) {
   let active = 0;
   if (/provision|resum|install/i.test(status)) active = 1;
   if (/launch|ready|live/i.test(status)) active = 2;
@@ -25,6 +33,11 @@ export default function BootOverlay({ status, error }: { status: string; error?:
           <div className="hg-boot-status" style={{ color: "var(--red)", maxWidth: 360, textAlign: "center" }}>
             {status}
           </div>
+          {onRetry && (
+            <button className="hangar-btn" onClick={onRetry}>
+              Reconnect
+            </button>
+          )}
         </>
       ) : (
         <>

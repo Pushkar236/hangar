@@ -28,6 +28,7 @@ export default function Workbench({
   const [phase, setPhase] = useState<Phase>("connecting");
   const [status, setStatus] = useState("Connecting…");
   const [sandboxId, setSandboxId] = useState<string | null>(null);
+  const [gen, setGen] = useState(0); // bump to reconnect (re-create the session)
 
   // terminals (agents)
   const [tabs, setTabs] = useState<string[]>(["t1"]);
@@ -45,6 +46,13 @@ export default function Workbench({
   const sideRef = useRef<ImperativePanelHandle>(null);
 
   useEffect(() => {
+    setPhase("connecting");
+    setStatus("Connecting…");
+    setTabs(["t1"]);
+    setActiveTab("t1");
+    nextNum.current = 2;
+    setOpenFiles([]);
+    setActivePath(null);
     const s = new HangarSession(WS_URL, { token, projectId, claudeKey });
     setSession(s);
     const off = s.on((m) => {
@@ -68,6 +76,9 @@ export default function Workbench({
         setOpenFiles((prev) =>
           prev.map((f) => (f.path === m.path ? { ...f, dirty: false } : f)),
         );
+      } else if (m.type === "expired") {
+        setPhase("error");
+        setStatus(String(m.message ?? "Session expired — reconnect to resume."));
       } else if (m.type === "error") {
         setPhase("error");
         setStatus(`Error: ${m.message}`);
@@ -80,7 +91,7 @@ export default function Workbench({
       off();
       s.dispose();
     };
-  }, [token, projectId, claudeKey]);
+  }, [token, projectId, claudeKey, gen]);
 
   // Ctrl/Cmd+S saves the active file.
   useEffect(() => {
@@ -143,7 +154,13 @@ export default function Workbench({
   return (
     <div className="hg-app">
       <AnimatePresence>
-        {phase !== "ready" && <BootOverlay status={status} error={phase === "error"} />}
+        {phase !== "ready" && (
+          <BootOverlay
+            status={status}
+            error={phase === "error"}
+            onRetry={phase === "error" ? () => setGen((g) => g + 1) : undefined}
+          />
+        )}
       </AnimatePresence>
       <header className="hg-header">
         <button className="hg-icon-btn" onClick={onExit} title="Back to projects">
@@ -214,7 +231,7 @@ export default function Workbench({
                   {session &&
                     tabs.map((id) => (
                       <XTerm
-                        key={id}
+                        key={`${gen}-${id}`}
                         session={session}
                         terminalId={id}
                         active={id === activeTab}

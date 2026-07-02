@@ -119,6 +119,7 @@ wss.on("connection", (ws: WebSocket) => {
   let projectId = "";
   let starting = false;
   let closed = false;
+  let heartbeat: ReturnType<typeof setInterval> | undefined;
   const pids = new Map<string, number>();
 
   const send = (obj: Record<string, unknown>) => {
@@ -127,6 +128,7 @@ wss.on("connection", (ws: WebSocket) => {
   const cleanup = async () => {
     if (closed) return;
     closed = true;
+    if (heartbeat) clearInterval(heartbeat);
     const sb = sandbox;
     sandbox = null;
     pids.clear();
@@ -209,6 +211,13 @@ wss.on("connection", (ws: WebSocket) => {
           );
           send({ type: "ready", sandboxId: sandbox.sandboxId, resumed });
           await openTerminal("t1", msg.cols ?? 80, msg.rows ?? 24);
+          // Keep the sandbox alive while the browser stays connected, so an
+          // idle-but-open session never hits the timeout and dies mid-use.
+          if (heartbeat) clearInterval(heartbeat);
+          heartbeat = setInterval(() => {
+            sandbox?.setTimeout(SANDBOX_TIMEOUT_MS).catch(() => {});
+          }, 4 * 60 * 1000);
+          heartbeat.unref?.();
         } catch (err) {
           console.error("[start] failed:", err);
           send({ type: "error", message: `failed to start: ${String(err).slice(0, 300)}` });
@@ -273,7 +282,17 @@ wss.on("connection", (ws: WebSocket) => {
         }
       }
     } catch (err) {
-      send({ type: "error", message: String(err).slice(0, 200) });
+      const s = String(err);
+      // A dead/expired sandbox: stop touching it and tell the client to
+      // reconnect (which resumes the paused sandbox or starts a fresh one).
+      if (/not found|was not found|sandbox.*timeout|timeouterror/i.test(s)) {
+        if (heartbeat) clearInterval(heartbeat);
+        sandbox = null;
+        pids.clear();
+        send({ type: "expired", message: "Session expired — reconnect to resume your project." });
+      } else {
+        send({ type: "error", message: s.slice(0, 200) });
+      }
     }
   });
 
