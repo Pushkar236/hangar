@@ -194,7 +194,12 @@ wss.on("connection", (ws: WebSocket) => {
             }
           }
           if (!sandbox) {
-            send({ type: "status", message: "Provisioning sandbox & installing Claude Code…" });
+            send({
+              type: "status",
+              message: CUSTOM_TEMPLATE
+                ? "Booting sandbox…"
+                : "Provisioning sandbox & installing Claude Code…",
+            });
             sandbox = CUSTOM_TEMPLATE
               ? await Sandbox.create(CUSTOM_TEMPLATE, { timeoutMs: SANDBOX_TIMEOUT_MS })
               : await Sandbox.create({ timeoutMs: SANDBOX_TIMEOUT_MS });
